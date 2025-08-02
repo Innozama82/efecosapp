@@ -16,7 +16,7 @@ import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/aut
 import { auth } from '@/services/firebase';
 import { useUser } from '@/contexts/UserContext';
 import { dataService } from '@/services/dataService';
-import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react-native';
+import { Eye, EyeOff, Mail, Lock, CircleAlert as AlertCircle } from 'lucide-react-native';
 
 export default function LoginScreen({ onSignUp }: { onSignUp?: () => void }) {
   const { setUser } = useUser();
