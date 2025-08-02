@@ -10,24 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { 
-  User, 
-  Car, 
-  Building, 
-  Settings, 
-  Bell, 
-  Shield, 
-  CircleHelp as HelpCircle, 
-  LogOut, 
-  CreditCard as Edit, 
-  Plus,
-  ChevronRight,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  RefreshCw,
-  Database
-} from 'lucide-react-native';
+import { User, Car, Building, Settings, Bell, Shield, CircleHelp as HelpCircle, LogOut, CreditCard as Edit, Plus, ChevronRight, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Circle as XCircle, RefreshCw, Database } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { BudgetModal } from '@/components/BudgetModal';
 import VehicleModal from '@/components/VehicleModal';

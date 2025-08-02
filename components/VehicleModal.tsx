@@ -10,7 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { X, Car, Save, Edit } from 'lucide-react-native';
+import { X, Car, Save, CreditCard as Edit } from 'lucide-react-native';
 import { Vehicle } from '@/types';
 
 interface VehicleModalProps {
