@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { User, Vehicle } from '@/types';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import { auth, db } from '@/services/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth } from '@/services/firebase';
 import { obdService } from '@/services/obdService';
 import { dataService } from '@/services/dataService';
 
@@ -11,17 +10,11 @@ import { dataService } from '@/services/dataService';
  * 
  * Features:
  * - Firebase authentication integration
- * - User profile management
+ * - User profile management with role-based access
  * - Vehicle management
  * - Trip tracking state
  * - Comprehensive logout functionality with cleanup
- * 
- * Logout Process:
- * 1. Calls all registered logout callbacks to clean up component state
- * 2. Disconnects from OBD service to stop data collection
- * 3. Signs out from Firebase authentication
- * 4. Clears all local state (user, vehicles, tracking, etc.)
- * 5. Handles errors gracefully with fallback cleanup
+ * - Real-time data synchronization with web app
  */
 
 interface UserContextType {
@@ -48,6 +41,8 @@ interface UserContextType {
   isTrackingTrip: boolean;
   setIsTrackingTrip: (tracking: boolean) => void;
   isInitializing: boolean;
+  refreshUserData: () => Promise<void>;
+  syncWithWebApp: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -66,7 +61,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const monthlyLimit = user?.monthlyFuelLimit || 0;
   const personalBudget = user?.personalBudget || 0;
 
-  // Calculate monthly usage from trips
+  // Calculate monthly usage from database
   const calculateMonthlyUsage = useCallback(async () => {
     if (!user?.id) return;
     
@@ -82,7 +77,35 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setMonthlyUsage(prev => prev + amount);
   }, []);
 
-  // Recalculate monthly usage when trips change
+  // Refresh user data from database
+  const refreshUserData = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      const updatedProfile = await dataService.getUserProfile(user.id);
+      if (updatedProfile) {
+        setUser(updatedProfile);
+      }
+      await calculateMonthlyUsage();
+      await loadVehicles();
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+    }
+  }, [user?.id]);
+
+  // Sync with web app
+  const syncWithWebApp = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      await dataService.syncUserData(user.id);
+      await refreshUserData();
+    } catch (error) {
+      console.error('Error syncing with web app:', error);
+    }
+  }, [user?.id, refreshUserData]);
+
+  // Recalculate monthly usage when user changes
   useEffect(() => {
     calculateMonthlyUsage();
   }, [calculateMonthlyUsage]);
@@ -124,8 +147,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
       
       // Set active vehicle if none is selected
       const activeVeh = userVehicles.find(v => v.isActive);
-      if (activeVeh && !activeVehicle) {
+      if (activeVeh && (!activeVehicle || activeVehicle.id !== activeVeh.id)) {
         setActiveVehicle(activeVeh);
+      } else if (!activeVeh && userVehicles.length > 0) {
+        // If no vehicle is marked as active, set the first one as active
+        const firstVehicle = userVehicles[0];
+        await dataService.setActiveVehicle(user.id, firstVehicle.id);
+        setActiveVehicle(firstVehicle);
       }
     } catch (error) {
       console.error('Error loading vehicles:', error);
@@ -147,6 +175,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       // Set as active if it's the first vehicle
       if (vehicles.length === 0) {
         setActiveVehicle(newVehicle);
+        await dataService.setActiveVehicle(user.id, newVehicle.id);
       }
       
       return newVehicle;
@@ -165,14 +194,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
       if (updates.isActive && activeVehicle?.id !== vehicleId) {
         const updatedVehicle = vehicles.find(v => v.id === vehicleId);
         if (updatedVehicle) {
-          setActiveVehicle(updatedVehicle);
+          setActiveVehicle({ ...updatedVehicle, ...updates });
+          if (user?.id) {
+            await dataService.setActiveVehicle(user.id, vehicleId);
+          }
         }
       }
     } catch (error) {
       console.error('Error updating vehicle:', error);
       throw error;
     }
-  }, [activeVehicle]);
+  }, [activeVehicle, vehicles, user?.id]);
 
   const deleteVehicle = useCallback(async (vehicleId: string) => {
     try {
@@ -182,39 +214,52 @@ export function UserProvider({ children }: { children: ReactNode }) {
       // If deleted vehicle was active, set another vehicle as active
       if (activeVehicle?.id === vehicleId) {
         const remainingVehicles = vehicles.filter(v => v.id !== vehicleId);
-        setActiveVehicle(remainingVehicles.length > 0 ? remainingVehicles[0] : null);
+        if (remainingVehicles.length > 0) {
+          setActiveVehicle(remainingVehicles[0]);
+          if (user?.id) {
+            await dataService.setActiveVehicle(user.id, remainingVehicles[0].id);
+          }
+        } else {
+          setActiveVehicle(null);
+        }
       }
     } catch (error) {
       console.error('Error deleting vehicle:', error);
       throw error;
     }
-  }, [activeVehicle, vehicles]);
+  }, [activeVehicle, vehicles, user?.id]);
 
-  // Listen for Firebase Auth state changes and sync user profile from Firestore
+  // Listen for Firebase Auth state changes and load user profile
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          const userSnap = await getDoc(userRef);
-          let profile: User;
-          if (userSnap.exists()) {
-            profile = userSnap.data() as User;
+          console.log('Auth state changed - user logged in:', firebaseUser.uid);
+          
+          // Get user profile from database
+          const userProfile = await dataService.getUserProfile(firebaseUser.uid);
+          
+          if (userProfile) {
+            console.log('User profile loaded:', userProfile.type);
+            setUser(userProfile);
           } else {
-            // Create user profile if not exists
-            profile = {
-              id: firebaseUser.uid,
+            console.log('No user profile found, creating new profile');
+            // Create new user profile for citizens
+            const newProfile = await dataService.createUserProfile(firebaseUser.uid, {
               name: firebaseUser.displayName || '',
               email: firebaseUser.email || '',
               type: 'citizen',
               personalBudget: 0,
-              createdAt: new Date(firebaseUser.metadata.creationTime || Date.now()),
-            };
-            await setDoc(userRef, profile);
+            });
+            setUser(newProfile);
           }
-          setUser(profile);
         } else {
+          console.log('Auth state changed - user logged out');
           setUser(null);
+          setVehicles([]);
+          setActiveVehicle(null);
+          setMonthlyUsage(0);
+          setIsTrackingTrip(false);
         }
       } catch (error) {
         console.error('Error in auth state change:', error);
@@ -223,6 +268,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         setIsInitializing(false);
       }
     });
+    
     return () => unsubscribe();
   }, []);
 
@@ -230,12 +276,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (user?.id) {
       loadVehicles();
+      calculateMonthlyUsage();
     }
-  }, [user?.id, loadVehicles]);
+  }, [user?.id, loadVehicles, calculateMonthlyUsage]);
 
   const logout = useCallback(async () => {
     setIsLoggingOut(true);
     try {
+      console.log('Starting logout process...');
+      
       // Call all logout callbacks first to clean up any active processes
       logoutCallbacks.forEach(callback => {
         try {
@@ -258,6 +307,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setMonthlyUsage(0);
       setLogoutCallbacks([]);
       setIsTrackingTrip(false);
+      
+      console.log('Logout completed successfully');
     } catch (error) {
       console.error('Logout error:', error);
       // Even if Firebase logout fails, clear local state and disconnect services
@@ -299,6 +350,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
         isTrackingTrip,
         setIsTrackingTrip,
         isInitializing,
+        refreshUserData,
+        syncWithWebApp,
       }}
     >
       {children}

@@ -8,6 +8,11 @@ export interface User {
   monthlyFuelLimit?: number;
   personalBudget?: number;
   createdAt: Date;
+  // Additional fields for business users
+  businessId?: string;
+  permissions?: string[];
+  role?: string;
+  isActive?: boolean;
 }
 
 export interface Vehicle {
@@ -19,6 +24,11 @@ export interface Vehicle {
   fuelType: 'gasoline' | 'diesel' | 'hybrid' | 'electric';
   licensePlate: string;
   isActive: boolean;
+  // Additional fields for business vehicles
+  businessId?: string;
+  assignedDriverId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface Trip {
@@ -46,6 +56,13 @@ export interface Trip {
   efficiency: number; // km/l
   isManual: boolean;
   obdData?: OBDData[];
+  // Additional fields for business trips
+  businessId?: string;
+  purpose?: string;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedAt?: Date;
+  createdAt?: Date;
 }
 
 export interface OBDData {
@@ -55,6 +72,11 @@ export interface OBDData {
   fuelConsumption: number;
   engineLoad: number;
   coolantTemp: number;
+  // Additional OBD parameters
+  throttlePosition?: number;
+  airIntakeTemp?: number;
+  fuelPressure?: number;
+  engineRunTime?: number;
 }
 
 export interface FuelLog {
@@ -75,6 +97,12 @@ export interface FuelLog {
   };
   requiresApproval?: boolean;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedAt?: Date;
+  // Additional fields for business fuel logs
+  businessId?: string;
+  purpose?: string;
+  createdAt?: Date;
 }
 
 export interface FuelStation {
@@ -93,6 +121,16 @@ export interface FuelStation {
     premium: number;
   };
   lastUpdated: Date;
+  // Additional station info
+  amenities?: string[];
+  operatingHours?: {
+    open: string;
+    close: string;
+  };
+  contactInfo?: {
+    phone?: string;
+    website?: string;
+  };
 }
 
 export interface DrivingBehavior {
@@ -104,4 +142,107 @@ export interface DrivingBehavior {
   speedingEvents: number;
   fuelEfficiencyScore: number;
   overallScore: number;
+  // Additional behavior metrics
+  totalDistance?: number;
+  totalDrivingTime?: number;
+  avgSpeed?: number;
+  maxSpeed?: number;
+  ecoScore?: number;
+  safetyScore?: number;
+}
+
+// Business-specific types
+export interface Business {
+  id: string;
+  name: string;
+  address: string;
+  contactInfo: {
+    email: string;
+    phone: string;
+  };
+  settings: {
+    fuelBudgetPerDriver: number;
+    requireApproval: boolean;
+    allowedFuelTypes: string[];
+  };
+  createdAt: Date;
+  isActive: boolean;
+}
+
+export interface BusinessUser {
+  id: string;
+  businessId: string;
+  email: string;
+  role: 'owner' | 'admin' | 'driver';
+  permissions: string[];
+  monthlyFuelLimit?: number;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface Driver {
+  id: string;
+  businessId: string;
+  userId: string;
+  licenseNumber: string;
+  licenseExpiry: Date;
+  assignedVehicles: string[];
+  monthlyFuelLimit: number;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+// API Response types
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+// Form types
+export interface LoginForm {
+  email: string;
+  password: string;
+}
+
+export interface SignUpForm {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface VehicleForm {
+  make: string;
+  model: string;
+  year: number;
+  licensePlate: string;
+  fuelType: Vehicle['fuelType'];
+}
+
+export interface TripForm {
+  startLocation: string;
+  endLocation: string;
+  distance: number;
+  fuelUsed: number;
+  cost: number;
+  purpose?: string;
+}
+
+export interface FuelLogForm {
+  station: string;
+  liters: number;
+  pricePerLiter: number;
+  odometer: number;
+  receiptImage?: string;
+  location: string;
 }

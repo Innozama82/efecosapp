@@ -102,9 +102,16 @@ export default function VehicleModal({
       await onSave(vehicleData);
       onClose();
     } catch (error) {
+      console.error('Error saving vehicle:', error);
       Alert.alert('Error', 'Failed to save vehicle. Please try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (!isLoading) {
+      onClose();
     }
   };
 
@@ -120,7 +127,7 @@ export default function VehicleModal({
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.container}>
         <View style={styles.header}>
@@ -130,7 +137,11 @@ export default function VehicleModal({
               {isEditing ? 'Edit Vehicle' : 'Add New Vehicle'}
             </Text>
           </View>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity 
+            style={styles.closeButton} 
+            onPress={handleClose}
+            disabled={isLoading}
+          >
             <X size={24} color="#6B7280" />
           </TouchableOpacity>
         </View>
@@ -149,9 +160,15 @@ export default function VehicleModal({
             <TextInput
               style={[styles.input, errors.make && styles.inputError]}
               value={formData.make}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, make: text }))}
+              onChangeText={(text) => {
+                setFormData(prev => ({ ...prev, make: text }));
+                if (errors.make) {
+                  setErrors(prev => ({ ...prev, make: '' }));
+                }
+              }}
               placeholder="e.g., Toyota, Honda, Ford"
               autoCapitalize="words"
+              editable={!isLoading}
             />
             {errors.make && <Text style={styles.errorText}>{errors.make}</Text>}
           </View>
@@ -162,9 +179,15 @@ export default function VehicleModal({
             <TextInput
               style={[styles.input, errors.model && styles.inputError]}
               value={formData.model}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, model: text }))}
+              onChangeText={(text) => {
+                setFormData(prev => ({ ...prev, model: text }));
+                if (errors.model) {
+                  setErrors(prev => ({ ...prev, model: '' }));
+                }
+              }}
               placeholder="e.g., Camry, Civic, F-150"
               autoCapitalize="words"
+              editable={!isLoading}
             />
             {errors.model && <Text style={styles.errorText}>{errors.model}</Text>}
           </View>
@@ -175,10 +198,16 @@ export default function VehicleModal({
             <TextInput
               style={[styles.input, errors.year && styles.inputError]}
               value={formData.year}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, year: text }))}
+              onChangeText={(text) => {
+                setFormData(prev => ({ ...prev, year: text }));
+                if (errors.year) {
+                  setErrors(prev => ({ ...prev, year: '' }));
+                }
+              }}
               placeholder="e.g., 2020"
               keyboardType="numeric"
               maxLength={4}
+              editable={!isLoading}
             />
             {errors.year && <Text style={styles.errorText}>{errors.year}</Text>}
           </View>
@@ -189,9 +218,15 @@ export default function VehicleModal({
             <TextInput
               style={[styles.input, errors.licensePlate && styles.inputError]}
               value={formData.licensePlate}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, licensePlate: text }))}
+              onChangeText={(text) => {
+                setFormData(prev => ({ ...prev, licensePlate: text }));
+                if (errors.licensePlate) {
+                  setErrors(prev => ({ ...prev, licensePlate: '' }));
+                }
+              }}
               placeholder="e.g., ABC123"
               autoCapitalize="characters"
+              editable={!isLoading}
             />
             {errors.licensePlate && <Text style={styles.errorText}>{errors.licensePlate}</Text>}
           </View>
@@ -208,6 +243,7 @@ export default function VehicleModal({
                     formData.fuelType === type.value && styles.fuelTypeButtonActive
                   ]}
                   onPress={() => setFormData(prev => ({ ...prev, fuelType: type.value as Vehicle['fuelType'] }))}
+                  disabled={isLoading}
                 >
                   <Text style={[
                     styles.fuelTypeText,
@@ -227,10 +263,14 @@ export default function VehicleModal({
               <Car size={32} color="#2563EB" />
               <View style={styles.previewText}>
                 <Text style={styles.previewVehicle}>
-                  {formData.year} {formData.make} {formData.model}
+                  {formData.year || 'YYYY'} {formData.make || 'Make'} {formData.model || 'Model'}
                 </Text>
-                <Text style={styles.previewPlate}>{formData.licensePlate}</Text>
-                <Text style={styles.previewFuel}>{formData.fuelType.charAt(0).toUpperCase() + formData.fuelType.slice(1)}</Text>
+                <Text style={styles.previewPlate}>
+                  {formData.licensePlate || 'License Plate'}
+                </Text>
+                <Text style={styles.previewFuel}>
+                  {formData.fuelType.charAt(0).toUpperCase() + formData.fuelType.slice(1)}
+                </Text>
               </View>
             </View>
           </View>
@@ -239,7 +279,7 @@ export default function VehicleModal({
         <View style={styles.footer}>
           <TouchableOpacity 
             style={[styles.cancelButton, isLoading && styles.buttonDisabled]} 
-            onPress={onClose}
+            onPress={handleClose}
             disabled={isLoading}
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -255,7 +295,7 @@ export default function VehicleModal({
               <>
                 {isEditing ? <Edit size={16} color="#FFFFFF" /> : <Save size={16} color="#FFFFFF" />}
                 <Text style={styles.saveButtonText}>
-                  {isEditing ? 'Update' : 'Add Vehicle'}
+                  {isEditing ? 'Update Vehicle' : 'Add Vehicle'}
                 </Text>
               </>
             )}
@@ -279,6 +319,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+    paddingTop: 50,
   },
   headerContent: {
     flexDirection: 'row',
@@ -321,9 +362,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: '#FFFFFF',
+    color: '#1F2937',
   },
   inputError: {
     borderColor: '#DC2626',
+    backgroundColor: '#FEF2F2',
   },
   errorText: {
     color: '#DC2626',
@@ -433,4 +476,4 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#FFFFFF',
   },
-}); 
+});
